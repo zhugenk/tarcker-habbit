@@ -20,18 +20,39 @@
 </head>
 <body class="bg-slate-100 min-h-screen">
 
-<!-- AUTH VIEW (DISEMBUNYIKAN TOTAL) -->
-<div id="authView" class="hidden"></div>
+<!-- ============================================ -->
+<!-- AUTH VIEW (LOGIN / REGISTER) -->
+<!-- ============================================ -->
+<div id="authView" class="min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-slate-800">Day to Day Habit</h1>
+      <p class="text-slate-500 mt-1">4 Tracker dalam 1 Ekosistem</p>
+    </div>
+    <div class="flex mb-6 bg-slate-100 rounded-lg p-1">
+      <button id="tabLogin" onclick="switchAuth('login')" class="flex-1 py-2 rounded-md font-medium tab-active">Login</button>
+      <button id="tabRegister" onclick="switchAuth('register')" class="flex-1 py-2 rounded-md font-medium">Register</button>
+    </div>
+    <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
+      <input type="email" id="email" required placeholder="Email" class="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
+      <input type="password" id="password" required placeholder="Password (min 6 karakter)" minlength="6" class="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
+      <button type="submit" id="authBtn" class="w-full bg-gradient-to-r from-blue-700 to-blue-500 text-white py-3 rounded-lg font-semibold hover:opacity-90 transition">Login</button>
+    </form>
+    <p id="authMsg" class="text-center mt-4 text-sm"></p>
+  </div>
+</div>
 
-<!-- APP VIEW (LANGSUNG TAMPIL) -->
-<div id="appView">
+<!-- ============================================ -->
+<!-- APP VIEW -->
+<!-- ============================================ -->
+<div id="appView" class="hidden">
   <header class="bg-gradient-to-r from-slate-800 to-blue-800 text-white p-4 sticky top-0 z-40 shadow-lg">
     <div class="max-w-7xl mx-auto flex justify-between items-center">
       <div>
         <h1 class="text-xl font-bold">Day to Day Habit</h1>
-        <p class="text-xs opacity-80" id="userEmail">Mode Tamu (Data tidak akan tersimpan)</p>
+        <p class="text-xs opacity-80" id="userEmail"></p>
       </div>
-      <button onclick="alert('Fitur login dinonaktifkan sementara untuk testing.')" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm">Logout</button>
+      <button onclick="logout()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm">Logout</button>
     </div>
   </header>
 
@@ -147,9 +168,7 @@
   </main>
 </div>
 
-<!-- ============================================== -->
-<!-- MODAL GOAL (INI YANG SEBELUMNYA HILANG) -->
-<!-- ============================================== -->
+<!-- MODAL GOAL -->
 <div id="goalModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
   <div class="bg-white rounded-xl p-6 w-full max-w-md">
     <h3 class="text-xl font-bold mb-4">Tambah Goal</h3>
@@ -172,9 +191,7 @@
   </div>
 </div>
 
-<!-- ============================================== -->
 <!-- MODAL TASK -->
-<!-- ============================================== -->
 <div id="taskModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
   <div class="bg-white rounded-xl p-6 w-full max-w-md">
     <h3 class="text-xl font-bold mb-4">Tambah Task</h3>
@@ -197,9 +214,7 @@
   </div>
 </div>
 
-<!-- ============================================== -->
 <!-- MODAL HABIT -->
-<!-- ============================================== -->
 <div id="habitModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
   <div class="bg-white rounded-xl p-6 w-full max-w-md">
     <h3 class="text-xl font-bold mb-4">Tambah Habit</h3>
@@ -224,19 +239,66 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// =====================================================
-// BYPASS LOGIN (MODE TAMU)
-// =====================================================
-let currentUser = { id: '00000000-0000-0000-0000-000000000000', email: 'guest@local' };
+let currentUser = null;
+let authMode = 'login';
 let taskChart = null;
 let cache = { goals: [], tasks: [], habits: [], habitLogs: [] };
 
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('authView').classList.add('hidden');
-    document.getElementById('appView').classList.remove('hidden');
-    document.getElementById('userEmail').textContent = 'Mode Tamu (Data tidak akan tersimpan)';
-    loadAllData();
+// =====================================================
+// AUTH HANDLING
+// =====================================================
+function switchAuth(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('tab-active', mode==='login');
+  document.getElementById('tabRegister').classList.toggle('tab-active', mode==='register');
+  document.getElementById('authBtn').textContent = mode==='login' ? 'Login' : 'Daftar';
+}
+
+async function handleAuth(e) {
+  e.preventDefault();
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const msg = document.getElementById('authMsg');
+  msg.textContent = 'Memproses...'; msg.className = 'text-center mt-4 text-sm text-slate-500';
+
+  const { data, error } = authMode === 'login'
+    ? await sb.auth.signInWithPassword({ email, password })
+    : await sb.auth.signUp({ email, password });
+
+  if (error) { 
+    msg.textContent = error.message; 
+    msg.className = 'text-center mt-4 text-sm text-red-500'; 
+    return; 
+  }
+  
+  if (authMode === 'register') {
+    msg.textContent = 'Registrasi berhasil! Jika diminta verifikasi, cek email Anda. Jika tidak, silakan login.';
+    msg.className = 'text-center mt-4 text-sm text-green-600';
+  }
+}
+
+async function logout() { 
+  await sb.auth.signOut(); 
+  location.reload();
+}
+
+sb.auth.onAuthStateChange((_event, session) => {
+  if (session?.user) { 
+    currentUser = session.user; 
+    showApp(); 
+  } else { 
+    currentUser = null; 
+    document.getElementById('authView').classList.remove('hidden'); 
+    document.getElementById('appView').classList.add('hidden'); 
+  }
 });
+
+function showApp() {
+  document.getElementById('authView').classList.add('hidden');
+  document.getElementById('appView').classList.remove('hidden');
+  document.getElementById('userEmail').textContent = currentUser.email;
+  loadAllData();
+}
 
 // =====================================================
 // TAB NAVIGATION
@@ -254,17 +316,19 @@ function switchTab(name) {
   if (name==='habits') renderHabits();
 }
 
-function openModal(id) { document.getElementById(id).classList.add('show'); }
+function openGoalModal() { document.getElementById('goalModal').classList.add('show'); }
+function openTaskModal() { document.getElementById('taskModal').classList.add('show'); }
+function openHabitModal() { document.getElementById('habitModal').classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 
 // =====================================================
-// LOAD DATA (Akan Kosong karena belum login)
+// LOAD DATA
 // =====================================================
 async function loadAllData() {
   const [g, t, h, hl] = await Promise.all([
-    sb.from('goals').select('*'),
-    sb.from('tasks').select('*'),
-    sb.from('habits').select('*'),
+    sb.from('goals').select('*').order('created_at',{ascending:false}),
+    sb.from('tasks').select('*').order('due_date'),
+    sb.from('habits').select('*').order('created_at'),
     sb.from('habit_logs').select('*')
   ]);
   cache.goals = g.data || [];
@@ -275,23 +339,55 @@ async function loadAllData() {
 }
 
 // =====================================================
-// FUNGSI RENDER
+// GOAL TRACKER
 // =====================================================
+async function saveGoal(e) {
+  e.preventDefault();
+  const goal = {
+    user_id: currentUser.id,
+    title: document.getElementById('goalTitle').value,
+    category: document.getElementById('goalCategory').value,
+    target: +document.getElementById('goalTarget').value,
+    current: +document.getElementById('goalCurrent').value,
+    deadline: document.getElementById('goalDeadline').value || null,
+    status: 'In Progress'
+  };
+  const { error } = await sb.from('goals').insert(goal);
+  if (error) return alert('Error: ' + error.message);
+  closeModal('goalModal'); e.target.reset(); loadAllData();
+}
+
+async function updateGoalProgress(id, value) {
+  const goal = cache.goals.find(g => g.id===id);
+  const current = Math.min(goal.target, Math.max(0, value));
+  const status = current >= goal.target ? 'Completed' : 'In Progress';
+  await sb.from('goals').update({ current, status }).eq('id', id);
+  loadAllData();
+}
+
+async function deleteGoal(id) {
+  if (!confirm('Hapus goal ini?')) return;
+  await sb.from('goals').delete().eq('id', id);
+  loadAllData();
+}
+
 function renderGoals() {
   const el = document.getElementById('goalsList');
   document.getElementById('yearGoals').textContent = new Date().getFullYear();
-  if (!cache.goals.length) { el.innerHTML = '<p class="text-slate-400 col-span-full text-center py-8">Belum ada goal. (Fitur tambah dinonaktifkan di mode tamu)</p>'; }
-  else {
+  if (!cache.goals.length) { 
+    el.innerHTML = '<p class="text-slate-400 col-span-full text-center py-8">Belum ada goal. Tambahkan goal pertama Anda!</p>'; 
+  } else {
     el.innerHTML = cache.goals.map(g => {
       const pct = g.target > 0 ? Math.round((g.current/g.target)*100) : 0;
       const color = pct>=100 ? 'green' : pct>=50 ? 'blue' : 'orange';
       return `
-        <div class="bg-white p-5 rounded-xl shadow-sm">
+        <div class="bg-white p-5 rounded-xl shadow-sm hover:shadow-md transition">
           <div class="flex justify-between items-start mb-3">
             <div>
               <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">${g.category||'-'}</span>
               <h3 class="font-bold text-slate-800 mt-2">${g.title}</h3>
             </div>
+            <button onclick="deleteGoal(${g.id})" class="text-red-500 hover:text-red-700 text-sm">✕</button>
           </div>
           <div class="mb-2 flex justify-between text-sm text-slate-600">
             <span>${g.current} / ${g.target}</span>
@@ -300,28 +396,75 @@ function renderGoals() {
           <div class="w-full bg-slate-100 rounded-full h-2 mb-3">
             <div class="bg-${color}-500 h-2 rounded-full transition-all" style="width:${pct}%"></div>
           </div>
+          <div class="flex gap-2">
+            <input type="number" value="${g.current}" onchange="updateGoalProgress(${g.id}, this.value)" class="flex-1 px-2 py-1 border rounded text-sm">
+            <span class="text-xs text-slate-500 self-center">${g.deadline ? '📅 '+g.deadline : ''}</span>
+          </div>
         </div>
       `;
     }).join('');
   }
-  document.getElementById('statGoalsTotal').textContent = cache.goals.length;
-  document.getElementById('statGoalsDone').textContent = cache.goals.filter(g => g.status==='Completed').length;
-  document.getElementById('statGoalsAvg').textContent = (cache.goals.length ? Math.round(cache.goals.reduce((s,g)=> s+(g.target?(g.current/g.target*100):0),0)/cache.goals.length) : 0) + '%';
+  const total = cache.goals.length;
+  const done = cache.goals.filter(g => g.status==='Completed').length;
+  const avg = total ? Math.round(cache.goals.reduce((s,g)=> s+(g.target?(g.current/g.target*100):0),0)/total) : 0;
+  document.getElementById('statGoalsTotal').textContent = total;
+  document.getElementById('statGoalsDone').textContent = done;
+  document.getElementById('statGoalsAvg').textContent = avg + '%';
+}
+
+// =====================================================
+// TASK MANAGER
+// =====================================================
+async function saveTask(e) {
+  e.preventDefault();
+  const task = {
+    user_id: currentUser.id,
+    title: document.getElementById('taskTitle').value,
+    category: document.getElementById('taskCategory').value,
+    priority: document.getElementById('taskPriority').value,
+    due_date: document.getElementById('taskDue').value,
+    notes: document.getElementById('taskNotes').value,
+    status: 'Not Started'
+  };
+  const { error } = await sb.from('tasks').insert(task);
+  if (error) return alert('Error: ' + error.message);
+  closeModal('taskModal'); e.target.reset(); loadAllData();
+}
+
+async function toggleTaskStatus(id, current) {
+  const status = current === 'Completed' ? 'Not Started' : 'Completed';
+  await sb.from('tasks').update({ status }).eq('id', id);
+  loadAllData();
+}
+
+async function deleteTask(id) {
+  if (!confirm('Hapus task ini?')) return;
+  await sb.from('tasks').delete().eq('id', id);
+  loadAllData();
 }
 
 function renderTasks() {
   const tbody = document.getElementById('tasksTable');
+  const today = new Date().toISOString().split('T')[0];
   if (!cache.tasks.length) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-400">Belum ada task.</td></tr>';
-  else tbody.innerHTML = cache.tasks.map(t => `
+  else tbody.innerHTML = cache.tasks.map(t => {
+    const priColor = t.priority==='High'?'red':t.priority==='Medium'?'orange':'green';
+    const isOverdue = t.due_date < today && t.status !== 'Completed';
+    return `
       <tr class="border-t hover:bg-slate-50">
-        <td class="p-3 font-medium">${t.title}</td>
+        <td class="p-3 font-medium ${t.status==='Completed'?'line-through text-slate-400':''}">${t.title}</td>
         <td class="p-3 text-slate-600">${t.category||'-'}</td>
-        <td class="p-3"><span class="px-2 py-1 text-xs rounded bg-slate-100 text-slate-600">${t.priority}</span></td>
-        <td class="p-3 text-slate-600">${t.due_date||'-'}</td>
-        <td class="p-3"><span class="px-3 py-1 text-xs rounded bg-slate-100 text-slate-600">${t.status}</span></td>
-        <td class="p-3">-</td>
+        <td class="p-3"><span class="px-2 py-1 text-xs rounded bg-${priColor}-100 text-${priColor}-700">${t.priority}</span></td>
+        <td class="p-3 ${isOverdue?'text-red-600 font-medium':'text-slate-600'}">${t.due_date||'-'}</td>
+        <td class="p-3">
+          <button onclick="toggleTaskStatus(${t.id},'${t.status}')" class="px-3 py-1 text-xs rounded ${t.status==='Completed'?'bg-green-100 text-green-700':'bg-slate-100 text-slate-600'}">
+            ${t.status}
+          </button>
+        </td>
+        <td class="p-3"><button onclick="deleteTask(${t.id})" class="text-red-500 text-sm">Hapus</button></td>
       </tr>
-  `).join('');
+    `;
+  }).join('');
 
   const completed = cache.tasks.filter(t=>t.status==='Completed').length;
   const pending = cache.tasks.filter(t=>t.status!=='Completed').length;
@@ -332,8 +475,20 @@ function renderTasks() {
     data: { labels:['Completed','Pending'], datasets:[{ data:[completed,pending], backgroundColor:['#27ae60','#e0e0e0'], borderWidth:0 }] },
     options: { plugins:{ legend:{ position:'bottom' } }, cutout:'70%' }
   });
+
+  const upcoming = cache.tasks.filter(t=>t.status!=='Completed' && t.due_date).slice(0,5);
+  document.getElementById('upcomingTasks').innerHTML = upcoming.length
+    ? upcoming.map(t => `
+      <div class="flex justify-between items-center py-2 border-b last:border-0">
+        <span class="truncate ${t.due_date<today?'text-red-600 font-medium':''}">${t.title}</span>
+        <span class="text-xs text-slate-500 ml-2">${t.due_date}</span>
+      </div>`).join('')
+    : '<p class="text-slate-400 text-center py-4">Tidak ada deadline terdekat.</p>';
 }
 
+// =====================================================
+// WEEKLY TO-DO'S
+// =====================================================
 function renderWeekly() {
   const now = new Date();
   const day = now.getDay() || 7;
@@ -344,39 +499,119 @@ function renderWeekly() {
 
   const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
   const grid = document.getElementById('weeklyGrid');
-  grid.innerHTML = days.map((d,i) => `
-      <div class="bg-white rounded-xl p-3 shadow-sm border-t-4 border-slate-200">
+  let totalWeek = 0, doneWeek = 0;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  grid.innerHTML = days.map((d,i) => {
+    const date = new Date(monday); date.setDate(monday.getDate()+i);
+    const dateStr = date.toISOString().split('T')[0];
+    const dayTasks = cache.tasks.filter(t => t.due_date === dateStr);
+    const done = dayTasks.filter(t => t.status==='Completed').length;
+    totalWeek += dayTasks.length; doneWeek += done;
+    const pct = dayTasks.length ? Math.round((done/dayTasks.length)*100) : 0;
+    return `
+      <div class="bg-white rounded-xl p-3 shadow-sm border-t-4 ${dateStr===todayStr?'border-blue-500':'border-slate-200'}">
         <div class="text-center mb-2">
           <p class="font-bold text-slate-700 text-sm">${d}</p>
-          <p class="text-xs text-slate-400">${fmt(new Date(monday.getTime() + i*86400000))}</p>
-          <p class="text-lg font-bold text-slate-300 mt-1">0%</p>
+          <p class="text-xs text-slate-400">${fmt(date)}</p>
+          <p class="text-lg font-bold ${pct===100?'text-green-600':'text-blue-600'} mt-1">${pct}%</p>
         </div>
-        <div class="space-y-1"><p class="text-xs text-slate-300 text-center py-2">Kosong</p></div>
+        <div class="space-y-1">
+          ${dayTasks.length ? dayTasks.map(t => `
+            <div onclick="toggleTaskStatus(${t.id},'${t.status}')" class="cursor-pointer text-xs p-2 rounded ${t.status==='Completed'?'bg-green-50 text-green-700 line-through':'bg-slate-50 text-slate-700'} hover:opacity-80">
+              ${t.title}
+            </div>`).join('') : '<p class="text-xs text-slate-300 text-center py-2">Kosong</p>'}
+        </div>
       </div>
-  `).join('');
-  document.getElementById('weeklyOverall').textContent = '0%';
-  document.getElementById('weeklyBar').style.width = '0%';
+    `;
+  }).join('');
+
+  const overallPct = totalWeek ? Math.round((doneWeek/totalWeek)*100) : 0;
+  document.getElementById('weeklyOverall').textContent = overallPct + '%';
+  document.getElementById('weeklyBar').style.width = overallPct + '%';
+}
+
+// =====================================================
+// HABIT BUILDER
+// =====================================================
+async function saveHabit(e) {
+  e.preventDefault();
+  const habit = {
+    user_id: currentUser.id,
+    name: document.getElementById('habitName').value,
+    color: document.getElementById('habitColor').value
+  };
+  const { error } = await sb.from('habits').insert(habit);
+  if (error) return alert('Error: ' + error.message);
+  closeModal('habitModal'); e.target.reset(); loadAllData();
+}
+
+async function deleteHabit(id) {
+  if (!confirm('Hapus habit ini beserta lognya?')) return;
+  await sb.from('habits').delete().eq('id', id);
+  loadAllData();
+}
+
+async function toggleHabit(habitId, dateStr) {
+  const existing = cache.habitLogs.find(l => l.habit_id===habitId && l.log_date===dateStr);
+  if (existing) {
+    await sb.from('habit_logs').delete().eq('id', existing.id);
+  } else {
+    await sb.from('habit_logs').insert({ user_id: currentUser.id, habit_id: habitId, log_date: dateStr, completed: true });
+  }
+  loadAllData();
 }
 
 function renderHabits() {
-  document.getElementById('currentMonth').textContent = new Date().toLocaleDateString('id-ID',{month:'long',year:'numeric'});
-  document.getElementById('habitsGrid').innerHTML = '<p class="text-slate-400 text-center py-8">Belum ada habit. (Fitur tambah dinonaktifkan di mode tamu)</p>';
-  document.getElementById('statHabitsTotal').textContent = '0';
-  document.getElementById('statHabitsToday').textContent = '0';
-  document.getElementById('statHabitsMonth').textContent = '0%';
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const monthName = now.toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+  document.getElementById('currentMonth').textContent = monthName;
+
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const grid = document.getElementById('habitsGrid');
+  const todayStr = now.toISOString().split('T')[0];
+
+  if (!cache.habits.length) {
+    grid.innerHTML = '<p class="text-slate-400 text-center py-8">Belum ada habit. Tambahkan kebiasaan pertama Anda!</p>';
+  } else {
+    let html = '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr><th class="text-left p-2 sticky left-0 bg-white z-10">Habit</th>';
+    for (let d=1; d<=daysInMonth; d++) html += `<th class="p-1 text-center text-xs text-slate-400 font-normal">${d}</th>`;
+    html += '<th class="p-2">🗑</th></tr></thead><tbody>';
+
+    cache.habits.forEach(h => {
+      html += `<tr class="border-t"><td class="p-2 sticky left-0 bg-white z-10 font-medium" style="color:${h.color}">${h.name}</td>`;
+      for (let d=1; d<=daysInMonth; d++) {
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const done = cache.habitLogs.some(l => l.habit_id===h.id && l.log_date===dateStr);
+        html += `<td class="p-0.5 text-center"><div onclick="toggleHabit(${h.id},'${dateStr}')" class="habit-cell ${done?'done':''} mx-auto ${dateStr===todayStr?'ring-2 ring-blue-400':''}" style="${done?'background:'+h.color+';border-color:'+h.color:''}"></div></td>`;
+      }
+      html += `<td class="p-2"><button onclick="deleteHabit(${h.id})" class="text-red-500 text-xs">✕</button></td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    grid.innerHTML = html;
+  }
+
+  const totalHabits = cache.habits.length;
+  const todayDone = cache.habitLogs.filter(l => l.log_date === todayStr).length;
+  const monthLogs = cache.habitLogs.filter(l => l.log_date.startsWith(`${year}-${String(month+1).padStart(2,'0')}`)).length;
+  const totalPossible = totalHabits * daysInMonth;
+  const monthPct = totalPossible ? Math.round((monthLogs/totalPossible)*100) : 0;
+
+  document.getElementById('statHabitsTotal').textContent = totalHabits;
+  document.getElementById('statHabitsToday').textContent = todayDone;
+  document.getElementById('statHabitsMonth').textContent = monthPct + '%';
 }
 
 // =====================================================
-// FUNGSI MODAL & SAVE (MODE TAMU)
+// INIT - Cek session saat halaman dimuat
 // =====================================================
-function openGoalModal() { document.getElementById('goalModal').classList.add('show'); }
-function openTaskModal() { document.getElementById('taskModal').classList.add('show'); }
-function openHabitModal() { document.getElementById('habitModal').classList.add('show'); }
-function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-
-function saveGoal(e) { e.preventDefault(); alert('Mode Tamu: Fitur simpan dinonaktifkan. Silakan perbaiki login terlebih dahulu.'); closeModal('goalModal'); }
-function saveTask(e) { e.preventDefault(); alert('Mode Tamu: Fitur simpan dinonaktifkan.'); closeModal('taskModal'); }
-function saveHabit(e) { e.preventDefault(); alert('Mode Tamu: Fitur simpan dinonaktifkan.'); closeModal('habitModal'); }
+sb.auth.getSession().then(({data}) => {
+  if (data.session?.user) { 
+    currentUser = data.session.user; 
+    showApp(); 
+  }
+});
 </script>
 </body>
 </html>
