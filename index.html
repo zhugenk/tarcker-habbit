@@ -20,10 +20,8 @@
 </head>
 <body class="bg-slate-100 min-h-screen">
 
-<!-- AUTH VIEW (DISEMBUNYIKAN) -->
-<div id="authView" class="hidden">
-  <!-- ... kode login lama tidak dihapus, hanya disembunyikan ... -->
-</div>
+<!-- AUTH VIEW (DISEMBUNYIKAN TOTAL) -->
+<div id="authView" class="hidden"></div>
 
 <!-- APP VIEW (LANGSUNG TAMPIL) -->
 <div id="appView">
@@ -31,7 +29,7 @@
     <div class="max-w-7xl mx-auto flex justify-between items-center">
       <div>
         <h1 class="text-xl font-bold">Day to Day Habit</h1>
-        <p class="text-xs opacity-80" id="userEmail">Mode Tamu (Tanpa Login)</p>
+        <p class="text-xs opacity-80" id="userEmail">Mode Tamu (Data tidak akan tersimpan)</p>
       </div>
       <button onclick="alert('Fitur login dinonaktifkan sementara untuk testing.')" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm">Logout</button>
     </div>
@@ -149,8 +147,72 @@
   </main>
 </div>
 
-<!-- MODAL-MODAL (GOAL, TASK, HABIT) TETAP ADA DI SINI -->
-<!-- (Kode modal sama persis seperti sebelumnya, tidak perlu diubah) -->
+<!-- ============================================== -->
+<!-- MODAL GOAL (INI YANG SEBELUMNYA HILANG) -->
+<!-- ============================================== -->
+<div id="goalModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl p-6 w-full max-w-md">
+    <h3 class="text-xl font-bold mb-4">Tambah Goal</h3>
+    <form onsubmit="saveGoal(event)" class="space-y-3">
+      <input type="text" id="goalTitle" required placeholder="Judul Goal (cth: 100 Juta Pertama)" class="w-full px-3 py-2 border rounded-lg">
+      <select id="goalCategory" class="w-full px-3 py-2 border rounded-lg">
+        <option>Finance</option><option>Health</option><option>Career</option>
+        <option>Relationship</option><option>Personal Growth</option><option>Spiritual</option>
+      </select>
+      <div class="grid grid-cols-2 gap-3">
+        <input type="number" id="goalTarget" placeholder="Target" value="100" class="w-full px-3 py-2 border rounded-lg">
+        <input type="number" id="goalCurrent" placeholder="Current" value="0" class="w-full px-3 py-2 border rounded-lg">
+      </div>
+      <input type="date" id="goalDeadline" class="w-full px-3 py-2 border rounded-lg">
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeModal('goalModal')" class="flex-1 py-2 border rounded-lg">Batal</button>
+        <button type="submit" class="flex-1 py-2 bg-blue-600 text-white rounded-lg">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- MODAL TASK -->
+<!-- ============================================== -->
+<div id="taskModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl p-6 w-full max-w-md">
+    <h3 class="text-xl font-bold mb-4">Tambah Task</h3>
+    <form onsubmit="saveTask(event)" class="space-y-3">
+      <input type="text" id="taskTitle" required placeholder="Judul Task" class="w-full px-3 py-2 border rounded-lg">
+      <select id="taskCategory" class="w-full px-3 py-2 border rounded-lg">
+        <option>Work</option><option>Personal</option><option>Health</option>
+        <option>Finance</option><option>Learning</option>
+      </select>
+      <select id="taskPriority" class="w-full px-3 py-2 border rounded-lg">
+        <option>High</option><option selected>Medium</option><option>Low</option>
+      </select>
+      <input type="date" id="taskDue" required class="w-full px-3 py-2 border rounded-lg">
+      <textarea id="taskNotes" placeholder="Catatan (opsional)" class="w-full px-3 py-2 border rounded-lg"></textarea>
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeModal('taskModal')" class="flex-1 py-2 border rounded-lg">Batal</button>
+        <button type="submit" class="flex-1 py-2 bg-blue-600 text-white rounded-lg">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- MODAL HABIT -->
+<!-- ============================================== -->
+<div id="habitModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl p-6 w-full max-w-md">
+    <h3 class="text-xl font-bold mb-4">Tambah Habit</h3>
+    <form onsubmit="saveHabit(event)" class="space-y-3">
+      <input type="text" id="habitName" required placeholder="Nama Habit (cth: Olahraga 30 menit)" class="w-full px-3 py-2 border rounded-lg">
+      <input type="color" id="habitColor" value="#3498db" class="w-full h-10 rounded-lg">
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeModal('habitModal')" class="flex-1 py-2 border rounded-lg">Batal</button>
+        <button type="submit" class="flex-1 py-2 bg-blue-600 text-white rounded-lg">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script>
 // =====================================================
@@ -165,19 +227,14 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // =====================================================
 // BYPASS LOGIN (MODE TAMU)
 // =====================================================
-// Kita buat user palsu agar kode tidak error saat memanggil currentUser.id
 let currentUser = { id: '00000000-0000-0000-0000-000000000000', email: 'guest@local' };
 let taskChart = null;
 let cache = { goals: [], tasks: [], habits: [], habitLogs: [] };
 
-// Langsung tampilkan aplikasi saat halaman dimuat
 document.addEventListener('DOMContentLoaded', () => {
-    // Sembunyikan auth, tampilkan app
     document.getElementById('authView').classList.add('hidden');
     document.getElementById('appView').classList.remove('hidden');
     document.getElementById('userEmail').textContent = 'Mode Tamu (Data tidak akan tersimpan)';
-    
-    // Muat data dari Supabase (kemungkinan kosong karena RLS)
     loadAllData();
 });
 
@@ -204,7 +261,6 @@ function closeModal(id) { document.getElementById(id).classList.remove('show'); 
 // LOAD DATA (Akan Kosong karena belum login)
 // =====================================================
 async function loadAllData() {
-  // Karena tidak ada session, Supabase akan mengembalikan array kosong
   const [g, t, h, hl] = await Promise.all([
     sb.from('goals').select('*'),
     sb.from('tasks').select('*'),
@@ -219,7 +275,7 @@ async function loadAllData() {
 }
 
 // =====================================================
-// FUNGSI RENDER (Sama seperti sebelumnya)
+// FUNGSI RENDER
 // =====================================================
 function renderGoals() {
   const el = document.getElementById('goalsList');
@@ -310,15 +366,17 @@ function renderHabits() {
   document.getElementById('statHabitsMonth').textContent = '0%';
 }
 
-// FUNGSI SAVE DI-NONAKTIFKAN SEMENTARA
-function saveGoal(e) { e.preventDefault(); alert('Mode Tamu: Fitur simpan dinonaktifkan. Silakan perbaiki login terlebih dahulu.'); closeModal('goalModal'); }
-function saveTask(e) { e.preventDefault(); alert('Mode Tamu: Fitur simpan dinonaktifkan.'); closeModal('taskModal'); }
-function saveHabit(e) { e.preventDefault(); alert('Mode Tamu: Fitur simpan dinonaktifkan.'); closeModal('habitModal'); }
-
+// =====================================================
+// FUNGSI MODAL & SAVE (MODE TAMU)
+// =====================================================
 function openGoalModal() { document.getElementById('goalModal').classList.add('show'); }
 function openTaskModal() { document.getElementById('taskModal').classList.add('show'); }
 function openHabitModal() { document.getElementById('habitModal').classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+function saveGoal(e) { e.preventDefault(); alert('Mode Tamu: Fitur simpan dinonaktifkan. Silakan perbaiki login terlebih dahulu.'); closeModal('goalModal'); }
+function saveTask(e) { e.preventDefault(); alert('Mode Tamu: Fitur simpan dinonaktifkan.'); closeModal('taskModal'); }
+function saveHabit(e) { e.preventDefault(); alert('Mode Tamu: Fitur simpan dinonaktifkan.'); closeModal('habitModal'); }
 </script>
 </body>
 </html>
