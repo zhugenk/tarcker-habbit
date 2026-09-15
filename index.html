@@ -42,7 +42,6 @@
 
 <!-- APP VIEW -->
 <div id="appView" class="hidden">
-  <!-- Header -->
   <header class="bg-gradient-to-r from-slate-800 to-blue-800 text-white p-4 sticky top-0 z-40 shadow-lg">
     <div class="max-w-7xl mx-auto flex justify-between items-center">
       <div>
@@ -53,7 +52,6 @@
     </div>
   </header>
 
-  <!-- Tabs -->
   <nav class="bg-white shadow-sm sticky top-16 z-30">
     <div class="max-w-7xl mx-auto flex overflow-x-auto">
       <button onclick="switchTab('goals')" id="tab-goals" class="flex-1 min-w-max px-6 py-4 font-medium tab-active">🎯 Goal Tracker</button>
@@ -230,10 +228,10 @@
 
 <script>
 // =====================================================
-// KONFIGURASI SUPABASE - GANTI DENGAN MILIK ANDA
+// KONFIGURASI SUPABASE
 // =====================================================
-const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+const SUPABASE_URL = 'https://tgwyyqlmmdyehonpanhi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnd3l5cWxtbWR5ZWhvbnBhbmhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NDIyNDYsImV4cCI6MjEwNTAxODI0Nn0.2qkKyDBzNF50yz54eyoJAbWc_lUoWlJ7Or8LiXIEnLA';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -384,7 +382,6 @@ function renderGoals() {
       `;
     }).join('');
   }
-  // Stats
   const total = cache.goals.length;
   const done = cache.goals.filter(g => g.status==='Completed').length;
   const avg = total ? Math.round(cache.goals.reduce((s,g)=> s+(g.target?(g.current/g.target*100):0),0)/total) : 0;
@@ -447,7 +444,6 @@ function renderTasks() {
     `;
   }).join('');
 
-  // Chart
   const completed = cache.tasks.filter(t=>t.status==='Completed').length;
   const pending = cache.tasks.filter(t=>t.status!=='Completed').length;
   const ctx = document.getElementById('taskChart').getContext('2d');
@@ -458,7 +454,6 @@ function renderTasks() {
     options: { plugins:{ legend:{ position:'bottom' } }, cutout:'70%' }
   });
 
-  // Upcoming
   const upcoming = cache.tasks.filter(t=>t.status!=='Completed' && t.due_date).slice(0,5);
   document.getElementById('upcomingTasks').innerHTML = upcoming.length
     ? upcoming.map(t => `
@@ -574,7 +569,6 @@ function renderHabits() {
     grid.innerHTML = html;
   }
 
-  // Stats
   const totalHabits = cache.habits.length;
   const todayDone = cache.habitLogs.filter(l => l.log_date === todayStr).length;
   const monthLogs = cache.habitLogs.filter(l => l.log_date.startsWith(`${year}-${String(month+1).padStart(2,'0')}`)).length;
