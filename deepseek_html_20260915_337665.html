@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day to Day Habit - Ekosistem 4 Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { font-family: 'Segoe UI', Roboto, sans-serif; }
+  .tab-active { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; }
+  .modal { display: none; }
+  .modal.show { display: flex; }
+  .habit-cell { width: 22px; height: 22px; border: 1px solid #e0e0e0; border-radius: 4px; cursor: pointer; }
+  .habit-cell.done { background: #27ae60; border-color: #27ae60; }
+  .fade-in { animation: fadeIn 0.3s ease-in; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px);} to {opacity:1; transform: translateY(0);} }
+</style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+<!-- AUTH VIEW -->
+<div id="authView" class="min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-slate-800">Day to Day Habit</h1>
+      <p class="text-slate-500 mt-1">4 Tracker dalam 1 Ekosistem</p>
+    </div>
+    <div class="flex mb-6 bg-slate-100 rounded-lg p-1">
+      <button id="tabLogin" onclick="switchAuth('login')" class="flex-1 py-2 rounded-md font-medium tab-active">Login</button>
+      <button id="tabRegister" onclick="switchAuth('register')" class="flex-1 py-2 rounded-md font-medium">Register</button>
+    </div>
+    <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
+      <input type="email" id="email" required placeholder="Email" class="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
+      <input type="password" id="password" required placeholder="Password (min 6 karakter)" minlength="6" class="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
+      <button type="submit" id="authBtn" class="w-full bg-gradient-to-r from-blue-700 to-blue-500 text-white py-3 rounded-lg font-semibold hover:opacity-90 transition">Login</button>
+    </form>
+    <p id="authMsg" class="text-center mt-4 text-sm"></p>
+  </div>
+</div>
+
+<!-- APP VIEW -->
+<div id="appView" class="hidden">
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-slate-800 to-blue-800 text-white p-4 sticky top-0 z-40 shadow-lg">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-xl font-bold">Day to Day Habit</h1>
+        <p class="text-xs opacity-80" id="userEmail"></p>
+      </div>
+      <button onclick="logout()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm">Logout</button>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="bg-white shadow-sm sticky top-16 z-30">
+    <div class="max-w-7xl mx-auto flex overflow-x-auto">
+      <button onclick="switchTab('goals')" id="tab-goals" class="flex-1 min-w-max px-6 py-4 font-medium tab-active">🎯 Goal Tracker</button>
+      <button onclick="switchTab('tasks')" id="tab-tasks" class="flex-1 min-w-max px-6 py-4 font-medium text-slate-600">📋 Task Manager</button>
+      <button onclick="switchTab('weekly')" id="tab-weekly" class="flex-1 min-w-max px-6 py-4 font-medium text-slate-600">📝 Weekly To-Do's</button>
+      <button onclick="switchTab('habits')" id="tab-habits" class="flex-1 min-w-max px-6 py-4 font-medium text-slate-600">🏃 Habit Builder</button>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto p-4 md:p-6">
+
+    <!-- GOAL TRACKER -->
+    <section id="view-goals" class="fade-in">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-slate-800">🎯 Goal Tracker <span id="yearGoals" class="text-slate-400 text-lg"></span></h2>
+        <button onclick="openGoalModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Tambah Goal</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm">
+          <p class="text-slate-500 text-sm">Total Goals</p>
+          <p id="statGoalsTotal" class="text-3xl font-bold text-slate-800">0</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm">
+          <p class="text-slate-500 text-sm">Tercapai</p>
+          <p id="statGoalsDone" class="text-3xl font-bold text-green-600">0</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm">
+          <p class="text-slate-500 text-sm">Progress Rata-rata</p>
+          <p id="statGoalsAvg" class="text-3xl font-bold text-blue-600">0%</p>
+        </div>
+      </div>
+      <div id="goalsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </section>
+
+    <!-- TASK MANAGER -->
+    <section id="view-tasks" class="hidden">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-slate-800">📋 Task Manager</h2>
+        <button onclick="openTaskModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Tambah Task</button>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div class="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm">
+          <h3 class="font-semibold text-slate-700 mb-3">Statistik Tugas</h3>
+          <canvas id="taskChart" height="80"></canvas>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm">
+          <h3 class="font-semibold text-slate-700 mb-3">Upcoming Deadlines</h3>
+          <div id="upcomingTasks" class="space-y-2 text-sm"></div>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-slate-600">
+              <tr>
+                <th class="p-3 text-left">Task</th>
+                <th class="p-3 text-left">Kategori</th>
+                <th class="p-3 text-left">Prioritas</th>
+                <th class="p-3 text-left">Deadline</th>
+                <th class="p-3 text-left">Status</th>
+                <th class="p-3 text-left">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tasksTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- WEEKLY TO-DO'S -->
+    <section id="view-weekly" class="hidden">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-slate-800">📝 Weekly To-Do's <span id="weekRange" class="text-slate-400 text-sm"></span></h2>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm mb-6">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm font-medium text-slate-600">Overall Progress</span>
+          <span id="weeklyOverall" class="text-sm font-bold text-blue-600">0%</span>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-3">
+          <div id="weeklyBar" class="bg-gradient-to-r from-blue-500 to-blue-700 h-3 rounded-full transition-all" style="width:0%"></div>
+        </div>
+      </div>
+      <div id="weeklyGrid" class="grid grid-cols-1 md:grid-cols-7 gap-3"></div>
+    </section>
+
+    <!-- HABIT BUILDER -->
+    <section id="view-habits" class="hidden">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-slate-800">🏃 Habit Builder <span id="currentMonth" class="text-slate-400 text-lg"></span></h2>
+        <button onclick="openHabitModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Tambah Habit</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm">
+          <p class="text-slate-500 text-sm">Total Habits</p>
+          <p id="statHabitsTotal" class="text-3xl font-bold text-slate-800">0</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm">
+          <p class="text-slate-500 text-sm">Completed Hari Ini</p>
+          <p id="statHabitsToday" class="text-3xl font-bold text-green-600">0</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm">
+          <p class="text-slate-500 text-sm">Progress Bulan Ini</p>
+          <p id="statHabitsMonth" class="text-3xl font-bold text-blue-600">0%</p>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm p-4 overflow-x-auto">
+        <div id="habitsGrid"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL GOAL -->
+<div id="goalModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl p-6 w-full max-w-md">
+    <h3 class="text-xl font-bold mb-4">Tambah Goal</h3>
+    <form onsubmit="saveGoal(event)" class="space-y-3">
+      <input type="text" id="goalTitle" required placeholder="Judul Goal (cth: 100 Juta Pertama)" class="w-full px-3 py-2 border rounded-lg">
+      <select id="goalCategory" class="w-full px-3 py-2 border rounded-lg">
+        <option>Finance</option><option>Health</option><option>Career</option>
+        <option>Relationship</option><option>Personal Growth</option><option>Spiritual</option>
+      </select>
+      <div class="grid grid-cols-2 gap-3">
+        <input type="number" id="goalTarget" placeholder="Target" value="100" class="w-full px-3 py-2 border rounded-lg">
+        <input type="number" id="goalCurrent" placeholder="Current" value="0" class="w-full px-3 py-2 border rounded-lg">
+      </div>
+      <input type="date" id="goalDeadline" class="w-full px-3 py-2 border rounded-lg">
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeModal('goalModal')" class="flex-1 py-2 border rounded-lg">Batal</button>
+        <button type="submit" class="flex-1 py-2 bg-blue-600 text-white rounded-lg">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL TASK -->
+<div id="taskModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl p-6 w-full max-w-md">
+    <h3 class="text-xl font-bold mb-4">Tambah Task</h3>
+    <form onsubmit="saveTask(event)" class="space-y-3">
+      <input type="text" id="taskTitle" required placeholder="Judul Task" class="w-full px-3 py-2 border rounded-lg">
+      <select id="taskCategory" class="w-full px-3 py-2 border rounded-lg">
+        <option>Work</option><option>Personal</option><option>Health</option>
+        <option>Finance</option><option>Learning</option>
+      </select>
+      <select id="taskPriority" class="w-full px-3 py-2 border rounded-lg">
+        <option>High</option><option selected>Medium</option><option>Low</option>
+      </select>
+      <input type="date" id="taskDue" required class="w-full px-3 py-2 border rounded-lg">
+      <textarea id="taskNotes" placeholder="Catatan (opsional)" class="w-full px-3 py-2 border rounded-lg"></textarea>
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeModal('taskModal')" class="flex-1 py-2 border rounded-lg">Batal</button>
+        <button type="submit" class="flex-1 py-2 bg-blue-600 text-white rounded-lg">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL HABIT -->
+<div id="habitModal" class="modal fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-xl p-6 w-full max-w-md">
+    <h3 class="text-xl font-bold mb-4">Tambah Habit</h3>
+    <form onsubmit="saveHabit(event)" class="space-y-3">
+      <input type="text" id="habitName" required placeholder="Nama Habit (cth: Olahraga 30 menit)" class="w-full px-3 py-2 border rounded-lg">
+      <input type="color" id="habitColor" value="#3498db" class="w-full h-10 rounded-lg">
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeModal('habitModal')" class="flex-1 py-2 border rounded-lg">Batal</button>
+        <button type="submit" class="flex-1 py-2 bg-blue-600 text-white rounded-lg">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// KONFIGURASI SUPABASE - GANTI DENGAN MILIK ANDA
+// =====================================================
+const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let authMode = 'login';
+let taskChart = null;
+let cache = { goals: [], tasks: [], habits: [], habitLogs: [] };
+
+// =====================================================
+// AUTH
+// =====================================================
+function switchAuth(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('tab-active', mode==='login');
+  document.getElementById('tabRegister').classList.toggle('tab-active', mode==='register');
+  document.getElementById('authBtn').textContent = mode==='login' ? 'Login' : 'Daftar';
+}
+
+async function handleAuth(e) {
+  e.preventDefault();
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const msg = document.getElementById('authMsg');
+  msg.textContent = 'Memproses...'; msg.className = 'text-center mt-4 text-sm text-slate-500';
+
+  const { data, error } = authMode === 'login'
+    ? await sb.auth.signInWithPassword({ email, password })
+    : await sb.auth.signUp({ email, password });
+
+  if (error) { msg.textContent = error.message; msg.className = 'text-center mt-4 text-sm text-red-500'; return; }
+  msg.textContent = authMode==='register' ? 'Cek email untuk verifikasi (jika diaktifkan).' : '';
+  msg.className = 'text-center mt-4 text-sm text-green-600';
+}
+
+async function logout() { await sb.auth.signOut(); }
+
+sb.auth.onAuthStateChange((_event, session) => {
+  if (session?.user) { currentUser = session.user; showApp(); }
+  else { currentUser = null; document.getElementById('authView').classList.remove('hidden'); document.getElementById('appView').classList.add('hidden'); }
+});
+
+function showApp() {
+  document.getElementById('authView').classList.add('hidden');
+  document.getElementById('appView').classList.remove('hidden');
+  document.getElementById('userEmail').textContent = currentUser.email;
+  loadAllData();
+}
+
+// =====================================================
+// TAB NAVIGATION
+// =====================================================
+function switchTab(name) {
+  ['goals','tasks','weekly','habits'].forEach(t => {
+    document.getElementById(`view-${t}`).classList.toggle('hidden', t!==name);
+    const btn = document.getElementById(`tab-${t}`);
+    btn.classList.toggle('tab-active', t===name);
+    btn.classList.toggle('text-slate-600', t!==name);
+  });
+  if (name==='tasks') renderTasks();
+  if (name==='weekly') renderWeekly();
+  if (name==='goals') renderGoals();
+  if (name==='habits') renderHabits();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// =====================================================
+// LOAD DATA
+// =====================================================
+async function loadAllData() {
+  const [g, t, h, hl] = await Promise.all([
+    sb.from('goals').select('*').order('created_at',{ascending:false}),
+    sb.from('tasks').select('*').order('due_date'),
+    sb.from('habits').select('*').order('created_at'),
+    sb.from('habit_logs').select('*')
+  ]);
+  cache.goals = g.data || [];
+  cache.tasks = t.data || [];
+  cache.habits = h.data || [];
+  cache.habitLogs = hl.data || [];
+  renderGoals(); renderTasks(); renderWeekly(); renderHabits();
+}
+
+// =====================================================
+// GOAL TRACKER
+// =====================================================
+async function saveGoal(e) {
+  e.preventDefault();
+  const goal = {
+    user_id: currentUser.id,
+    title: document.getElementById('goalTitle').value,
+    category: document.getElementById('goalCategory').value,
+    target: +document.getElementById('goalTarget').value,
+    current: +document.getElementById('goalCurrent').value,
+    deadline: document.getElementById('goalDeadline').value || null,
+    status: 'In Progress'
+  };
+  const { error } = await sb.from('goals').insert(goal);
+  if (error) return alert(error.message);
+  closeModal('goalModal'); e.target.reset(); loadAllData();
+}
+
+async function updateGoalProgress(id, value) {
+  const goal = cache.goals.find(g => g.id===id);
+  const current = Math.min(goal.target, Math.max(0, value));
+  const status = current >= goal.target ? 'Completed' : 'In Progress';
+  await sb.from('goals').update({ current, status }).eq('id', id);
+  loadAllData();
+}
+
+async function deleteGoal(id) {
+  if (!confirm('Hapus goal ini?')) return;
+  await sb.from('goals').delete().eq('id', id);
+  loadAllData();
+}
+
+function renderGoals() {
+  const el = document.getElementById('goalsList');
+  document.getElementById('yearGoals').textContent = new Date().getFullYear();
+  if (!cache.goals.length) { el.innerHTML = '<p class="text-slate-400 col-span-full text-center py-8">Belum ada goal. Tambahkan goal pertama Anda!</p>'; }
+  else {
+    el.innerHTML = cache.goals.map(g => {
+      const pct = g.target > 0 ? Math.round((g.current/g.target)*100) : 0;
+      const color = pct>=100 ? 'green' : pct>=50 ? 'blue' : 'orange';
+      return `
+        <div class="bg-white p-5 rounded-xl shadow-sm hover:shadow-md transition">
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">${g.category||'-'}</span>
+              <h3 class="font-bold text-slate-800 mt-2">${g.title}</h3>
+            </div>
+            <button onclick="deleteGoal(${g.id})" class="text-red-500 hover:text-red-700 text-sm">✕</button>
+          </div>
+          <div class="mb-2 flex justify-between text-sm text-slate-600">
+            <span>${g.current} / ${g.target}</span>
+            <span class="font-bold text-${color}-600">${pct}%</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 mb-3">
+            <div class="bg-${color}-500 h-2 rounded-full transition-all" style="width:${pct}%"></div>
+          </div>
+          <div class="flex gap-2">
+            <input type="number" value="${g.current}" onchange="updateGoalProgress(${g.id}, this.value)" class="flex-1 px-2 py-1 border rounded text-sm">
+            <span class="text-xs text-slate-500 self-center">${g.deadline ? '📅 '+g.deadline : ''}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+  // Stats
+  const total = cache.goals.length;
+  const done = cache.goals.filter(g => g.status==='Completed').length;
+  const avg = total ? Math.round(cache.goals.reduce((s,g)=> s+(g.target?(g.current/g.target*100):0),0)/total) : 0;
+  document.getElementById('statGoalsTotal').textContent = total;
+  document.getElementById('statGoalsDone').textContent = done;
+  document.getElementById('statGoalsAvg').textContent = avg + '%';
+}
+
+// =====================================================
+// TASK MANAGER
+// =====================================================
+async function saveTask(e) {
+  e.preventDefault();
+  const task = {
+    user_id: currentUser.id,
+    title: document.getElementById('taskTitle').value,
+    category: document.getElementById('taskCategory').value,
+    priority: document.getElementById('taskPriority').value,
+    due_date: document.getElementById('taskDue').value,
+    notes: document.getElementById('taskNotes').value,
+    status: 'Not Started'
+  };
+  const { error } = await sb.from('tasks').insert(task);
+  if (error) return alert(error.message);
+  closeModal('taskModal'); e.target.reset(); loadAllData();
+}
+
+async function toggleTaskStatus(id, current) {
+  const status = current === 'Completed' ? 'Not Started' : 'Completed';
+  await sb.from('tasks').update({ status }).eq('id', id);
+  loadAllData();
+}
+
+async function deleteTask(id) {
+  if (!confirm('Hapus task ini?')) return;
+  await sb.from('tasks').delete().eq('id', id);
+  loadAllData();
+}
+
+function renderTasks() {
+  const tbody = document.getElementById('tasksTable');
+  const today = new Date().toISOString().split('T')[0];
+  if (!cache.tasks.length) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-400">Belum ada task.</td></tr>';
+  else tbody.innerHTML = cache.tasks.map(t => {
+    const priColor = t.priority==='High'?'red':t.priority==='Medium'?'orange':'green';
+    const isOverdue = t.due_date < today && t.status !== 'Completed';
+    return `
+      <tr class="border-t hover:bg-slate-50">
+        <td class="p-3 font-medium ${t.status==='Completed'?'line-through text-slate-400':''}">${t.title}</td>
+        <td class="p-3 text-slate-600">${t.category||'-'}</td>
+        <td class="p-3"><span class="px-2 py-1 text-xs rounded bg-${priColor}-100 text-${priColor}-700">${t.priority}</span></td>
+        <td class="p-3 ${isOverdue?'text-red-600 font-medium':'text-slate-600'}">${t.due_date||'-'}</td>
+        <td class="p-3">
+          <button onclick="toggleTaskStatus(${t.id},'${t.status}')" class="px-3 py-1 text-xs rounded ${t.status==='Completed'?'bg-green-100 text-green-700':'bg-slate-100 text-slate-600'}">
+            ${t.status}
+          </button>
+        </td>
+        <td class="p-3"><button onclick="deleteTask(${t.id})" class="text-red-500 text-sm">Hapus</button></td>
+      </tr>
+    `;
+  }).join('');
+
+  // Chart
+  const completed = cache.tasks.filter(t=>t.status==='Completed').length;
+  const pending = cache.tasks.filter(t=>t.status!=='Completed').length;
+  const ctx = document.getElementById('taskChart').getContext('2d');
+  if (taskChart) taskChart.destroy();
+  taskChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels:['Completed','Pending'], datasets:[{ data:[completed,pending], backgroundColor:['#27ae60','#e0e0e0'], borderWidth:0 }] },
+    options: { plugins:{ legend:{ position:'bottom' } }, cutout:'70%' }
+  });
+
+  // Upcoming
+  const upcoming = cache.tasks.filter(t=>t.status!=='Completed' && t.due_date).slice(0,5);
+  document.getElementById('upcomingTasks').innerHTML = upcoming.length
+    ? upcoming.map(t => `
+      <div class="flex justify-between items-center py-2 border-b last:border-0">
+        <span class="truncate ${t.due_date<today?'text-red-600 font-medium':''}">${t.title}</span>
+        <span class="text-xs text-slate-500 ml-2">${t.due_date}</span>
+      </div>`).join('')
+    : '<p class="text-slate-400 text-center py-4">Tidak ada deadline terdekat.</p>';
+}
+
+// =====================================================
+// WEEKLY TO-DO'S
+// =====================================================
+function renderWeekly() {
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const monday = new Date(now); monday.setDate(now.getDate() - day + 1);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('id-ID',{day:'numeric',month:'short'});
+  document.getElementById('weekRange').textContent = `${fmt(monday)} - ${fmt(sunday)}`;
+
+  const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+  const grid = document.getElementById('weeklyGrid');
+  let totalWeek = 0, doneWeek = 0;
+
+  grid.innerHTML = days.map((d,i) => {
+    const date = new Date(monday); date.setDate(monday.getDate()+i);
+    const dateStr = date.toISOString().split('T')[0];
+    const dayTasks = cache.tasks.filter(t => t.due_date === dateStr);
+    const done = dayTasks.filter(t => t.status==='Completed').length;
+    totalWeek += dayTasks.length; doneWeek += done;
+    const pct = dayTasks.length ? Math.round((done/dayTasks.length)*100) : 0;
+    return `
+      <div class="bg-white rounded-xl p-3 shadow-sm border-t-4 ${dateStr===new Date().toISOString().split('T')[0]?'border-blue-500':'border-slate-200'}">
+        <div class="text-center mb-2">
+          <p class="font-bold text-slate-700 text-sm">${d}</p>
+          <p class="text-xs text-slate-400">${fmt(date)}</p>
+          <p class="text-lg font-bold ${pct===100?'text-green-600':'text-blue-600'} mt-1">${pct}%</p>
+        </div>
+        <div class="space-y-1">
+          ${dayTasks.length ? dayTasks.map(t => `
+            <div onclick="toggleTaskStatus(${t.id},'${t.status}')" class="cursor-pointer text-xs p-2 rounded ${t.status==='Completed'?'bg-green-50 text-green-700 line-through':'bg-slate-50 text-slate-700'} hover:opacity-80">
+              ${t.title}
+            </div>`).join('') : '<p class="text-xs text-slate-300 text-center py-2">Kosong</p>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const overallPct = totalWeek ? Math.round((doneWeek/totalWeek)*100) : 0;
+  document.getElementById('weeklyOverall').textContent = overallPct + '%';
+  document.getElementById('weeklyBar').style.width = overallPct + '%';
+}
+
+// =====================================================
+// HABIT BUILDER
+// =====================================================
+async function saveHabit(e) {
+  e.preventDefault();
+  const habit = {
+    user_id: currentUser.id,
+    name: document.getElementById('habitName').value,
+    color: document.getElementById('habitColor').value
+  };
+  const { error } = await sb.from('habits').insert(habit);
+  if (error) return alert(error.message);
+  closeModal('habitModal'); e.target.reset(); loadAllData();
+}
+
+async function deleteHabit(id) {
+  if (!confirm('Hapus habit ini beserta lognya?')) return;
+  await sb.from('habits').delete().eq('id', id);
+  loadAllData();
+}
+
+async function toggleHabit(habitId, dateStr) {
+  const existing = cache.habitLogs.find(l => l.habit_id===habitId && l.log_date===dateStr);
+  if (existing) {
+    await sb.from('habit_logs').delete().eq('id', existing.id);
+  } else {
+    await sb.from('habit_logs').insert({ user_id: currentUser.id, habit_id: habitId, log_date: dateStr, completed: true });
+  }
+  loadAllData();
+}
+
+function renderHabits() {
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const monthName = now.toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+  document.getElementById('currentMonth').textContent = monthName;
+
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const grid = document.getElementById('habitsGrid');
+  const todayStr = now.toISOString().split('T')[0];
+
+  if (!cache.habits.length) {
+    grid.innerHTML = '<p class="text-slate-400 text-center py-8">Belum ada habit. Tambahkan kebiasaan pertama Anda!</p>';
+  } else {
+    let html = '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr><th class="text-left p-2 sticky left-0 bg-white z-10">Habit</th>';
+    for (let d=1; d<=daysInMonth; d++) html += `<th class="p-1 text-center text-xs text-slate-400 font-normal">${d}</th>`;
+    html += '<th class="p-2">🗑</th></tr></thead><tbody>';
+
+    cache.habits.forEach(h => {
+      html += `<tr class="border-t"><td class="p-2 sticky left-0 bg-white z-10 font-medium" style="color:${h.color}">${h.name}</td>`;
+      for (let d=1; d<=daysInMonth; d++) {
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const done = cache.habitLogs.some(l => l.habit_id===h.id && l.log_date===dateStr);
+        html += `<td class="p-0.5 text-center"><div onclick="toggleHabit(${h.id},'${dateStr}')" class="habit-cell ${done?'done':''} mx-auto ${dateStr===todayStr?'ring-2 ring-blue-400':''}" style="${done?'background:'+h.color+';border-color:'+h.color:''}"></div></td>`;
+      }
+      html += `<td class="p-2"><button onclick="deleteHabit(${h.id})" class="text-red-500 text-xs">✕</button></td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    grid.innerHTML = html;
+  }
+
+  // Stats
+  const totalHabits = cache.habits.length;
+  const todayDone = cache.habitLogs.filter(l => l.log_date === todayStr).length;
+  const monthLogs = cache.habitLogs.filter(l => l.log_date.startsWith(`${year}-${String(month+1).padStart(2,'0')}`)).length;
+  const totalPossible = totalHabits * daysInMonth;
+  const monthPct = totalPossible ? Math.round((monthLogs/totalPossible)*100) : 0;
+
+  document.getElementById('statHabitsTotal').textContent = totalHabits;
+  document.getElementById('statHabitsToday').textContent = todayDone;
+  document.getElementById('statHabitsMonth').textContent = monthPct + '%';
+}
+
+// =====================================================
+// INIT
+// =====================================================
+sb.auth.getSession().then(({data}) => {
+  if (data.session?.user) { currentUser = data.session.user; showApp(); }
+});
+</script>
+</body>
+</html>
